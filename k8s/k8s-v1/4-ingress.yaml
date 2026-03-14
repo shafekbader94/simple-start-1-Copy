@@ -1,0 +1,158 @@
+# ====================
+# Ingress - Advanced Routing
+# ====================
+# Acts as a reverse proxy and load balancer
+# Provides:
+# - HTTP/HTTPS routing
+# - SSL/TLS termination
+# - Path-based routing
+# - Host-based routing (multiple domains)
+# - Single entry point for multiple services
+
+# PREREQUISITE: Install Ingress Controller first!
+# For Minikube: minikube addons enable ingress
+# For cloud: Install nginx-ingress or use cloud provider's ingress
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nestjs-ingress
+  annotations:
+    # Ingress controller specific settings
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    # Enable CORS
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    # SSL redirect
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # Rate limiting
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+spec:
+  ingressClassName: nginx  # Use nginx ingress controller
+  
+  # TLS/HTTPS configuration
+  tls:
+  - hosts:
+    - myapp.example.com
+    secretName: tls-secret  # Certificate stored in secret
+  
+  rules:
+  # Rule 1: Main application domain
+  - host: myapp.example.com  # Your domain
+    http:
+      paths:
+      # Route /api/* to NestJS backend
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: nestjs-service
+            port:
+              number: 80
+      
+      # Route / to frontend (if you have one)
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend-service  # Your frontend service
+            port:
+              number: 80
+  
+  # Rule 2: API subdomain (alternative approach)
+  - host: api.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: nestjs-service
+            port:
+              number: 80
+
+---
+# ====================
+# Example: Multiple services routing
+# ====================
+# This shows how to route different paths to different services
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: multi-service-ingress
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: myproject.local  # Add this to /etc/hosts for local testing
+    http:
+      paths:
+      # Users API
+      - path: /api/users
+        pathType: Prefix
+        backend:
+          service:
+            name: users-service
+            port:
+              number: 80
+      
+      # Products API
+      - path: /api/products
+        pathType: Prefix
+        backend:
+          service:
+            name: products-service
+            port:
+              number: 80
+      
+      # Courses API
+      - path: /api/courses
+        pathType: Prefix
+        backend:
+          service:
+            name: courses-service
+            port:
+              number: 80
+      
+      # Everything else to main NestJS app
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: nestjs-service
+            port:
+              number: 80
+
+---
+# ====================
+# TLS Certificate Secret
+# ====================
+# Create from your certificate files:
+# kubectl create secret tls tls-secret \
+#   --cert=path/to/cert.crt \
+#   --key=path/to/cert.key
+
+# For testing with self-signed certificate:
+# openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+#   -keyout tls.key -out tls.crt -subj "/CN=myapp.example.com"
+# kubectl create secret tls tls-secret --cert=tls.crt --key=tls.key
+
+# ====================
+# Testing Locally
+# ====================
+# 1. Add to /etc/hosts (Linux/Mac) or C:\Windows\System32\drivers\etc\hosts (Windows):
+#    127.0.0.1 myproject.local
+#
+# 2. Get Ingress IP:
+#    kubectl get ingress
+#
+# 3. Access your app:
+#    http://myproject.local
+#    http://myproject.local/api/users
+#    http://myproject.local/api/products
+
+# ====================
+# Path Types Explained
+# ====================
+# Prefix: Matches /api, /api/, /api/users, /api/products
+# Exact: Matches only /api (not /api/users)
+# ImplementationSpecific: Depends on ingress controller

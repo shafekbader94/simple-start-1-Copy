@@ -1,0 +1,32 @@
+kubectl apply -f k8s/pvc.yaml      # make sure the PVC exists
+kubectl apply -f k8s/mysql.yaml    # recreate MySQL deployment
+kubectl apply -f k8s/dep.yaml   # recreate NestJS deployment
+kubectl apply -f k8s/service.yaml   # recreate NestJS deployment
+
+kubectl get pods -w
+
+
+kubectl run -it --rm mysql-client --image=mysql:8 --restart=Never -- mysql -hmysql-service -umyuser -pmypassword myprojectdb
+
+
+SELECT * FROM user;
+
+____________________________________________
+Docker image first:
+docker build -t myprojecttest-app:latest .
+
+#if you’re using Minikube, make the image available to the cluster:
+# Load Docker image into Minikube
+    minikube image load myprojecttest-app:latest
+#or using docker desktop:
+    Settings → Kubernetes → Enable Kubernetes
+
+kubectl apply -f mysql-pvc.yaml
+kubectl apply -f mysql-deployment.yaml
+kubectl apply -f nestjs-deployment.yaml
+kubectl apply -f nestjs-service.yaml
+
+kubectl get pods
+kubectl get svc
+
+curl http://localhost:31597/api/users

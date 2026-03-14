@@ -1,0 +1,15 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "createdAt": "2026-02-20T20:55:02.172Z",
+      "updatedAt": "2026-02-20T20:55:02.172Z",
+      "isActive": true,
+      "firstName": "Aliceee",
+      "lastName": "Smithee",
+      "email": "aliceee@example.com",
+      "age": 40
+    }
+  ],
+  "nextId": 2
+}

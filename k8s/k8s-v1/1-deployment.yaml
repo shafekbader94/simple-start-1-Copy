@@ -1,0 +1,98 @@
+# ====================
+# NestJS Deployment
+# ====================
+# Creates 3 replicas of your NestJS application
+# Auto-restarts if pods crash
+# Manages rolling updates
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nestjs-app
+  labels:
+    app: nestjs
+spec:
+  replicas: 3  # Run 3 instances of your app
+  selector:
+    matchLabels:
+      app: nestjs
+  template:
+    metadata:
+      labels:
+        app: nestjs
+    spec:
+      containers:
+      - name: nestjs
+        image: myprojecttest-main-app:latest  # TODO: Replace with your actual image
+        imagePullPolicy: Never  # Don't pull if image already exists (useful for local testing)
+        ports:
+        - containerPort: 3000
+          name: http
+        
+        # Environment variables from ConfigMap
+        # envFrom:
+        # - configMapRef:
+        #     name: nestjs-config
+        
+        # Sensitive data from Secrets
+        env:
+        - name: DB_PASSWORD
+          value: "170110"
+        - name: JWT_SECRET
+          value: "mysecretkey"
+        
+        # Health checks - K8s pings these to know if pod is healthy
+        livenessProbe:
+          httpGet:
+            path: /  # Change to your health endpoint
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /  # Change to your health endpoint
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        
+        # Resource limits (prevent one pod from using all resources)
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+
+---
+# ====================
+# Service (LoadBalancer)
+# ====================
+# Exposes your app to external traffic
+# Load balances across all 3 pods
+# Provides stable endpoint
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: nestjs-service
+  labels:
+    app: nestjs
+spec:
+  type: NodePort       # Use NodePort for local testing #LoadBalancer  # Creates external load balancer (cloud provider)
+  selector:
+    app: nestjs  # Routes traffic to pods with this label
+  ports:
+  - port: 80          # External port (what users access)
+    targetPort: 3000  # Internal port (your app's port)
+    nodePort: 31597   # Host port (optional, for NodePort)
+    protocol: TCP
+    name: http
+  
+  # Session affinity (optional) - sends same user to same pod
+  # sessionAffinity: ClientIP

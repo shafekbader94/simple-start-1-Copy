@@ -1,0 +1,30 @@
+# ====================
+# Pod with ConfigMap
+# ====================
+# Demonstrates using ConfigMap for environment variables
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: config-pod
+spec:
+  containers:
+  - name: app
+    image: nginx
+    env:
+    # Load from ConfigMap
+    - name: APP_NAME
+      valueFrom:
+        configMapKeyRef:
+          name: app-config
+          key: APP_NAME
+    - name: APP_VERSION
+      valueFrom:
+        configMapKeyRef:
+          name: app-config
+          key: APP_VERSION
+
+# To create the ConfigMap first:
+# kubectl create configmap app-config \
+#   --from-literal=APP_NAME="My App" \
+#   --from-literal=APP_VERSION="1.0"

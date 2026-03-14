@@ -1,0 +1,72 @@
+# ====================
+# ConfigMap - Environment Variables
+# ====================
+# Stores NON-SENSITIVE configuration
+# Examples: API URLs, feature flags, port numbers
+# Can be updated without rebuilding container image
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nestjs-config
+data:
+  # Application settings
+  NODE_ENV: "production"
+  PORT: "3000"
+  
+  # Database configuration (NON-sensitive parts)
+  DB_HOST: "mysql-service"  # K8s service name for MySQL
+  DB_PORT: "3306"
+  DB_NAME: "myproject_db"
+  DB_USERNAME: "app_user"
+  # NOTE: Password goes in Secret, not here!
+  
+  # External services
+  API_URL: "https://api.example.com"
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+  
+  # Feature flags
+  ENABLE_SWAGGER: "true"
+  ENABLE_CORS: "true"
+  
+  # Logging
+  LOG_LEVEL: "info"
+
+---
+# ====================
+# Alternative: ConfigMap from file
+# ====================
+# You can also create ConfigMap from a .env file:
+#
+# kubectl create configmap nestjs-config --from-env-file=.env.production
+#
+# Or from multiple files:
+# kubectl create configmap nestjs-config \
+#   --from-file=app.properties \
+#   --from-file=database.properties
+
+# ====================
+# How to use in Deployment:
+# ====================
+# Method 1: Load all as environment variables (already in deployment.yaml)
+#   envFrom:
+#   - configMapRef:
+#       name: nestjs-config
+#
+# Method 2: Load specific values
+#   env:
+#   - name: NODE_ENV
+#     valueFrom:
+#       configMapKeyRef:
+#         name: nestjs-config
+#         key: NODE_ENV
+#
+# Method 3: Mount as files (for config files)
+#   volumes:
+#   - name: config
+#     configMap:
+#       name: nestjs-config
+#   volumeMounts:
+#   - name: config
+#     mountPath: /app/config

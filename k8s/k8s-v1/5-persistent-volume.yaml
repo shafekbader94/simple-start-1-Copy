@@ -1,0 +1,215 @@
+# ====================
+# Persistent Volumes (PV) & Persistent Volume Claims (PVC)
+# ====================
+# Why needed: Containers are ephemeral - data is lost when pod restarts
+# Use cases: Databases, file uploads, logs, application state
+
+# ====================
+# Storage Architecture
+# ====================
+# PersistentVolume (PV) = Actual storage (like a hard drive)
+# PersistentVolumeClaim (PVC) = Request for storage (like renting storage)
+# Pod → mounts PVC → binds to PV → stores data
+
+# ====================
+# 1. PersistentVolume (Admin creates this)
+# ====================
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mysql-pv
+spec:
+  capacity:
+    storage: 10Gi  # 10 GB storage
+  accessModes:
+    - ReadWriteOnce  # Can be mounted by single node for read/write
+  persistentVolumeReclaimPolicy: Retain  # Keep data after PVC is deleted
+  storageClassName: manual
+  hostPath:
+    path: "/mnt/data/mysql"  # Local path (for testing only!)
+    # In production, use cloud storage:
+    # AWS: awsElasticBlockStore
+    # Azure: azureDisk
+    # GCP: gcePersistentDisk
+
+---
+# ====================
+# 2. PersistentVolumeClaim (Developer requests storage)
+# ====================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: manual
+  resources:
+    requests:
+      storage: 10Gi  # Request 10GB
+
+---
+# ====================
+# 3. MySQL Deployment with Persistent Storage
+# ====================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+spec:
+  replicas: 1  # Database should have 1 replica only (or use StatefulSet)
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:8.0
+        ports:
+        - containerPort: 3306
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secret
+              key: root-password
+        - name: MYSQL_DATABASE
+          value: myproject_db
+        
+        # Mount the persistent volume
+        volumeMounts:
+        - name: mysql-storage
+          mountPath: /var/lib/mysql  # MySQL data directory
+      
+      # Define the volume from PVC
+      volumes:
+      - name: mysql-storage
+        persistentVolumeClaim:
+          claimName: mysql-pvc  # Use our PVC
+
+---
+# ====================
+# 4. MySQL Service (Internal access only)
+# ====================
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-service
+spec:
+  type: ClusterIP  # Internal only, not exposed externally
+  selector:
+    app: mysql
+  ports:
+  - port: 3306
+    targetPort: 3306
+
+---
+# ====================
+# 5. MySQL Root Password Secret
+# ====================
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysql-secret
+type: Opaque
+data:
+  # echo -n "your-root-password" | base64
+  root-password: cm9vdFBhc3N3b3JkMTIz  # rootPassword123
+
+---
+# ====================
+# Example: File Upload Storage for NestJS
+# ====================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: uploads-pvc
+spec:
+  accessModes:
+    - ReadWriteMany  # Multiple pods can read/write (needs NFS or cloud storage)
+  resources:
+    requests:
+      storage: 20Gi
+
+---
+# NestJS Deployment with file uploads storage
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nestjs-with-storage
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nestjs
+  template:
+    metadata:
+      labels:
+        app: nestjs
+    spec:
+      containers:
+      - name: nestjs
+        image: your-registry/nestjs-app:latest
+        volumeMounts:
+        - name: uploads
+          mountPath: /app/uploads  # Where your app stores uploaded files
+      volumes:
+      - name: uploads
+        persistentVolumeClaim:
+          claimName: uploads-pvc
+
+---
+# ====================
+# Access Modes Explained
+# ====================
+# ReadWriteOnce (RWO): Single node can mount for read/write
+#   - Use for: Databases, single-instance apps
+#   - Works with: Most storage types
+#
+# ReadOnlyMany (ROX): Multiple nodes can mount read-only
+#   - Use for: Shared configuration, static assets
+#   - Works with: NFS, cloud storage
+#
+# ReadWriteMany (RWX): Multiple nodes can mount for read/write
+#   - Use for: File uploads, shared data across pods
+#   - Works with: NFS, cloud storage (not hostPath!)
+
+# ====================
+# Storage Classes (Dynamic Provisioning)
+# ====================
+# Instead of creating PV manually, use StorageClass for auto-provisioning
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: fast-ssd
+provisioner: kubernetes.io/aws-ebs  # AWS EBS
+parameters:
+  type: gp3
+  fsType: ext4
+---
+# Use StorageClass in PVC:
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: auto-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: fast-ssd  # Uses StorageClass
+  resources:
+    requests:
+      storage: 10Gi
+
+# ====================
+# Commands
+# ====================
+# View PVs: kubectl get pv
+# View PVCs: kubectl get pvc
+# Check binding: kubectl describe pvc mysql-pvc
+# Delete PVC: kubectl delete pvc mysql-pvc
+# Access pod to check data: kubectl exec -it <pod-name> -- /bin/bash

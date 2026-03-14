@@ -1,0 +1,11 @@
+# Ignore files that shouldn't go into Docker image
+node_modules/
+dist/
+npm-debug.log
+.env
+.git/
+.gitignore
+README.md
+.vscode/
+coverage/
+users.json
